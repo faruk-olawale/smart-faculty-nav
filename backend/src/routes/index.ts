@@ -37,5 +37,6 @@ r.get('/search', ctrl.search);
 
 // AI Assistant
 r.post('/assistant', ctrl.aiQuery);
+r.post('/assistant/voice', ctrl.aiVoiceQuery);
 
 export default r;

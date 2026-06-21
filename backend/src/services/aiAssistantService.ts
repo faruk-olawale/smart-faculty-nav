@@ -193,3 +193,87 @@ export async function processAIQuery(req: AIQueryRequest): Promise<AIQueryRespon
     };
   }
 }
+
+export async function processVoiceQuery(
+  audioBase64: string,
+  mimeType: string
+): Promise<AIQueryResponse & { transcript?: string }> {
+  if (!process.env.GEMINI_API_KEY) {
+    return {
+      reply: 'AI assistant is not configured yet. Add GEMINI_API_KEY to the backend .env file.',
+      suggestions: ['Where is the NLP Lab?', 'List all locations'],
+    };
+  }
+
+  try {
+    const chat = model.startChat();
+
+    let result = await chat.sendMessage([
+      {
+        inlineData: {
+          mimeType,
+          data: audioBase64,
+        },
+      },
+      {
+        text:
+          'This is a spoken voice command from a user navigating the KWASU ICT faculty. ' +
+          'Listen to it, figure out what they want, and respond following your system instructions. ' +
+          'Use your tools to confirm any location before mentioning it.',
+      },
+    ]);
+
+    let lastLocation: { id: string; name: string; lat: number; lng: number } | null = null;
+
+    for (let i = 0; i < 3; i++) {
+      const calls = result.response.functionCalls();
+      if (!calls || calls.length === 0) break;
+
+      const responses = [];
+      for (const call of calls) {
+        const fn = FUNCTIONS[call.name];
+        const output = fn ? await fn(call.args) : { error: 'Unknown function' };
+
+        if (call.name === 'search_location' && !lastLocation) {
+          const b = output.buildings?.[0];
+          const d = output.departments?.[0];
+          if (b) lastLocation = { id: b.id, name: b.name, lat: b.latitude, lng: b.longitude };
+          else if (d && d.latitude != null) lastLocation = { id: d.buildingId, name: d.name, lat: d.latitude, lng: d.longitude };
+        }
+
+        responses.push({
+          functionResponse: { name: call.name, response: output },
+        });
+      }
+
+      result = await chat.sendMessage(responses as any);
+    }
+
+    const reply = result.response.text().trim() ||
+      'Sorry, I could not understand that. Please try again.';
+
+    const wantsNav = /\b(take|head|navigate|going|route)\b/i.test(reply);
+
+    return {
+      reply,
+      action: lastLocation
+        ? {
+            type: wantsNav ? 'navigate' : 'show_building',
+            targetId: lastLocation.id,
+            targetLat: lastLocation.lat,
+            targetLng: lastLocation.lng,
+            name: lastLocation.name,
+          }
+        : undefined,
+      suggestions: lastLocation
+        ? [`Navigate to ${lastLocation.name}`, 'Show on map', 'List all locations']
+        : ['Where is the NLP Lab?', 'List all locations', 'Emergency help'],
+    };
+  } catch (err) {
+    console.error('Gemini voice assistant error:', err);
+    return {
+      reply: 'Something went wrong understanding that. Please try again.',
+      suggestions: ['Where is the NLP Lab?', 'List all locations'],
+    };
+  }
+}

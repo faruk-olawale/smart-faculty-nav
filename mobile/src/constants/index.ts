@@ -15,8 +15,8 @@ export const FACULTY_ICT = {
   longitude: 4.482587,
 };
 
-export const API_BASE_URL = 'http://10.214.60.207:5000/api/v1';
-export const WS_URL = 'ws://10.214.60.207:5000/ws';
+export const API_BASE_URL = 'https://smart-faculty-nav.onrender.com/api/v1';
+export const WS_URL = 'wss://smart-faculty-nav.onrender.com/ws';
 
 export const COLORS = {
   primary: '#00E5C0',

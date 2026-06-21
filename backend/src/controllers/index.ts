@@ -373,3 +373,17 @@ export const aiQuery = async (
     res.json({ success: true, data: response });
   } catch (e) { next(e); }
 };
+
+// ─── AI ASSISTANT (VOICE) ──────────────────────────────────────────────
+
+export const aiVoiceQuery = async (
+  req: Request, res: Response, next: NextFunction
+) => {
+  try {
+    const { audioBase64, mimeType } = req.body;
+    if (!audioBase64) throw new AppError('audioBase64 is required', 400);
+    const { processVoiceQuery } = await import('../services/aiAssistantService');
+    const response = await processVoiceQuery(audioBase64, mimeType || 'audio/m4a');
+    res.json({ success: true, data: response });
+  } catch (e) { next(e); }
+};
