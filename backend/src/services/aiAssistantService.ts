@@ -186,7 +186,10 @@ export async function processAIQuery(req: AIQueryRequest): Promise<AIQueryRespon
         : ['Where is the NLP Lab?', 'List all locations', 'Emergency help'],
     };
   } catch (err) {
-    console.error('Gemini assistant error:', err);
+    const e = err as any;
+    console.error('Gemini assistant error STATUS:', e?.status);
+    console.error('Gemini assistant error MESSAGE:', e?.message);
+    console.error('Gemini assistant error DETAILS:', JSON.stringify(e?.errorDetails || e));
     return {
       reply: 'Something went wrong reaching the assistant. Please try again.',
       suggestions: ['Where is the NLP Lab?', 'List all locations'],
