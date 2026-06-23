@@ -1,19 +1,3 @@
-
-async function callGeminiWithRetry(model, request, maxRetries = 3) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await model.generateContent(request);
-    } catch (err) {
-      if (err?.status === 429 && attempt < maxRetries - 1) {
-        const delay = Math.pow(2, attempt) * 1000;
-        console.log('Rate limited. Retrying in ' + delay + 'ms...');
-        await new Promise(res => setTimeout(res, delay));
-      } else {
-        throw err;
-      }
-    }
-  }
-}
 import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI, SchemaType, Tool } from '@google/generative-ai';
 import { AIQueryRequest, AIQueryResponse } from '../types';
