@@ -95,7 +95,7 @@ Rules:
 - Be warm and concise, like a real tour guide giving quick spoken directions, not a chatbot.`;
 
 const model = genAI.getGenerativeModel({
-  model: 'gemini-1.5-flash',
+  model: 'gemini-1.5-flash-latest',
   systemInstruction: SYSTEM_INSTRUCTION,
   tools,
 });
