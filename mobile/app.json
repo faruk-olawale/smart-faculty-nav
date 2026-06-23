@@ -43,7 +43,8 @@
           "locationAlwaysAndWhenInUsePermission": "Allow KWASU ICT Nav to use your location for campus navigation.",
           "locationWhenInUsePermission": "Allow KWASU ICT Nav to use your location."
         }
-      ]
+      ],
+      "expo-audio"
     ]
   }
 }

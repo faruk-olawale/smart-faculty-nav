@@ -1,10 +1,13 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View, StyleSheet, Text, TouchableOpacity,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Modal, Pressable,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  LocateFixed, Layers, Home, AlertTriangle, X, Check,
+} from 'lucide-react-native';
 import { useAppStore } from '../store/useAppStore';
 import { useGPSTracking } from '../hooks/useGPSTracking';
 import { BuildingBottomSheet } from '../components/buildings/BuildingBottomSheet';
@@ -16,10 +19,14 @@ import { buildingApi } from '../services/api';
 import { MOCK_BUILDINGS } from '../utils/mockBuildings';
 import type { Building } from '../types';
 
+type MapType = 'default' | 'satellite';
+
 export default function MapScreen({ navigation }: any) {
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [followMode, setFollowMode] = useState(false);
+  const [mapType, setMapType] = useState<MapType>('default');
+  const [showMapTypeSheet, setShowMapTypeSheet] = useState(false);
 
   const {
     buildings, setBuildings,
@@ -34,7 +41,6 @@ export default function MapScreen({ navigation }: any) {
     getOnce, heading,
   } = useGPSTracking();
 
-  // Load buildings
   useEffect(() => {
     async function load() {
       try {
@@ -49,14 +55,12 @@ export default function MapScreen({ navigation }: any) {
     load();
   }, []);
 
-  // Send buildings to map
   useEffect(() => {
     if (buildings.length > 0 && !isLoading) {
       setTimeout(() => sendToMap('SET_BUILDINGS', buildings), 300);
     }
   }, [buildings, isLoading]);
 
-  // Send route to map
   useEffect(() => {
     if (route && !isLoading) {
       sendToMap('SET_ROUTE', {
@@ -66,7 +70,6 @@ export default function MapScreen({ navigation }: any) {
     }
   }, [route, isLoading]);
 
-  // Send user location to map + follow mode
   useEffect(() => {
     if (userLocation && !isLoading) {
       sendToMap('SET_USER_LOCATION', {
@@ -131,6 +134,12 @@ export default function MapScreen({ navigation }: any) {
     }
   }
 
+  function handleSelectMapType(type: MapType) {
+    setMapType(type);
+    sendToMap('SET_MAP_TYPE', { type });
+    setShowMapTypeSheet(false);
+  }
+
   function handleMessage(event: any) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -166,7 +175,7 @@ export default function MapScreen({ navigation }: any) {
     *{margin:0;padding:0;box-sizing:border-box;}
     html,body{height:100%;background:#050E1F;}
     #map{height:100%;width:100%;}
-    .leaflet-tile-pane{filter:brightness(0.85) saturate(0.85);}
+    #map.dimmed .leaflet-tile-pane{filter:brightness(0.85) saturate(0.85);}
     .leaflet-control-attribution{display:none;}
 
     @keyframes userPulse {
@@ -185,7 +194,7 @@ export default function MapScreen({ navigation }: any) {
   </style>
 </head>
 <body>
-<div id="map"></div>
+<div id="map" class="dimmed"></div>
 <script>
   const BUILDING_COLORS = ${JSON.stringify(BUILDING_COLORS)};
   const BUILDING_EMOJIS = ${JSON.stringify(BUILDING_EMOJIS)};
@@ -196,9 +205,25 @@ export default function MapScreen({ navigation }: any) {
     zoomControl: false,
   });
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 22,
-  }).addTo(map);
+  const DEFAULT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const SATELLITE_TILES = 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}';
+
+  let currentTileLayer = L.tileLayer(DEFAULT_TILES, { maxZoom: 22 }).addTo(map);
+
+  function setMapType(type) {
+    map.removeLayer(currentTileLayer);
+    const mapEl = document.getElementById('map');
+    if (type === 'satellite') {
+      currentTileLayer = L.tileLayer(SATELLITE_TILES, { maxZoom: 21 }).addTo(map);
+      mapEl.classList.remove('dimmed');
+      map.setMaxZoom(19);
+      if (map.getZoom() > 19) map.setZoom(19);
+    } else {
+      currentTileLayer = L.tileLayer(DEFAULT_TILES, { maxZoom: 22 }).addTo(map);
+      mapEl.classList.add('dimmed');
+      map.setMaxZoom(22);
+    }
+  }
 
   let markers = {}, userMarker = null, routeLayer = null;
   let allBuildings = [], accuracyCircle = null;
@@ -241,7 +266,6 @@ export default function MapScreen({ navigation }: any) {
         title: b.name,
       }).addTo(map);
 
-      // Label
       L.marker([b.latitude, b.longitude], {
         icon: L.divIcon({
           className: '',
@@ -280,7 +304,6 @@ export default function MapScreen({ navigation }: any) {
     if (userMarker) map.removeLayer(userMarker);
     if (accuracyCircle) map.removeLayer(accuracyCircle);
 
-    // Accuracy circle
     if (loc.accuracy && loc.accuracy < 50) {
       accuracyCircle = L.circle([loc.lat, loc.lng], {
         radius: loc.accuracy,
@@ -291,7 +314,6 @@ export default function MapScreen({ navigation }: any) {
       }).addTo(map);
     }
 
-    // Direction indicator
     const headingHTML = loc.heading != null
       ? \`<div style="
           position:absolute; top:-10px; left:50%;
@@ -360,6 +382,7 @@ export default function MapScreen({ navigation }: any) {
     if (type === 'SET_BUILDINGS') renderBuildings(payload);
     if (type === 'SET_USER_LOCATION') setUserLocation(payload);
     if (type === 'SET_ROUTE') setRoute(payload);
+    if (type === 'SET_MAP_TYPE') setMapType(payload.type);
     if (type === 'FLY_TO') {
       map.flyTo([payload.lat, payload.lng], payload.zoom || 19, {
         duration: 0.6,
@@ -388,7 +411,6 @@ export default function MapScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      {/* Map */}
       <WebView
         ref={webViewRef}
         source={{ html: mapHTML }}
@@ -401,45 +423,44 @@ export default function MapScreen({ navigation }: any) {
         allowsInlineMediaPlayback
       />
 
-      {/* Loading */}
       {isLoading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>
-            Loading ICT Faculty map...
-          </Text>
+          <Text style={styles.loadingText}>Loading ICT Faculty map...</Text>
         </View>
       )}
 
-      {/* Top badge */}
       <View style={styles.badge}>
         <View style={[
           styles.gpsIndicator,
           { backgroundColor: isTracking ? '#10B981' : COLORS.textDim }
         ]} />
         <Text style={styles.badgeText}>
-          💻 KWASU ICT · {buildings.length} locations
+          KWASU ICT · {buildings.length} locations
           {isTracking ? ' · GPS ON' : ''}
         </Text>
       </View>
 
-      {/* Right controls */}
       <View style={styles.controls}>
-        {/* Locate me */}
+        <TouchableOpacity
+          style={[styles.ctrlBtn, mapType === 'satellite' && styles.ctrlActive]}
+          onPress={() => setShowMapTypeSheet(true)}
+        >
+          <Layers size={20} color={mapType === 'satellite' ? COLORS.primary : COLORS.text} strokeWidth={2} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.ctrlBtn, isTracking && styles.ctrlActive]}
           onPress={handleLocateMe}
         >
-          <Text style={styles.ctrlIcon}>📍</Text>
+          <LocateFixed size={20} color={isTracking ? COLORS.primary : COLORS.text} strokeWidth={2} />
         </TouchableOpacity>
 
-        {/* Follow mode */}
         <FollowModeButton
           isFollowing={followMode}
           onToggle={handleToggleFollow}
         />
 
-        {/* Reset to faculty */}
         <TouchableOpacity
           style={styles.ctrlBtn}
           onPress={() => sendToMap('FLY_TO', {
@@ -448,19 +469,17 @@ export default function MapScreen({ navigation }: any) {
             zoom: 19,
           })}
         >
-          <Text style={styles.ctrlIcon}>💻</Text>
+          <Home size={20} color={COLORS.text} strokeWidth={2} />
         </TouchableOpacity>
 
-        {/* Emergency */}
         <TouchableOpacity
           style={[styles.ctrlBtn, styles.emergencyCtrl]}
           onPress={handleEmergency}
         >
-          <Text style={styles.ctrlIcon}>🚨</Text>
+          <AlertTriangle size={20} color={COLORS.danger} strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
-      {/* GPS Status Bar */}
       <LocationStatusBar
         isTracking={isTracking}
         accuracyLabel={accuracyLabel}
@@ -474,7 +493,6 @@ export default function MapScreen({ navigation }: any) {
         }}
       />
 
-      {/* Building Bottom Sheet */}
       <BuildingBottomSheet
         building={selectedBuilding}
         onClose={() => {
@@ -483,6 +501,62 @@ export default function MapScreen({ navigation }: any) {
         }}
         onNavigate={handleNavigate}
       />
+
+      <Modal
+        visible={showMapTypeSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMapTypeSheet(false)}
+      >
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setShowMapTypeSheet(false)}
+        >
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Map type</Text>
+              <TouchableOpacity onPress={() => setShowMapTypeSheet(false)}>
+                <X size={22} color={COLORS.textDim} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.sheetOptions}>
+              <TouchableOpacity
+                style={styles.sheetOption}
+                onPress={() => handleSelectMapType('default')}
+              >
+                <View style={[
+                  styles.sheetOptionPreview,
+                  styles.previewDefault,
+                  mapType === 'default' && styles.sheetOptionPreviewActive,
+                ]} />
+                <Text style={[
+                  styles.sheetOptionLabel,
+                  mapType === 'default' && styles.sheetOptionLabelActive,
+                ]}>Default</Text>
+                {mapType === 'default' && <Check size={16} color={COLORS.primary} />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.sheetOption}
+                onPress={() => handleSelectMapType('satellite')}
+              >
+                <View style={[
+                  styles.sheetOptionPreview,
+                  styles.previewSatellite,
+                  mapType === 'satellite' && styles.sheetOptionPreviewActive,
+                ]} />
+                <Text style={[
+                  styles.sheetOptionLabel,
+                  mapType === 'satellite' && styles.sheetOptionLabelActive,
+                ]}>Satellite</Text>
+                {mapType === 'satellite' && <Check size={16} color={COLORS.primary} />}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -553,5 +627,70 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.15)',
     borderColor: 'rgba(239,68,68,0.3)',
   },
-  ctrlIcon: { fontSize: 22 },
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: COLORS.panel,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: SIZES.sm,
+    paddingBottom: SIZES.xl,
+    paddingHorizontal: SIZES.md,
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
+  },
+  sheetHandle: {
+    width: 36, height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.border,
+    alignSelf: 'center',
+    marginBottom: SIZES.md,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SIZES.md,
+  },
+  sheetTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  sheetOptions: {
+    flexDirection: 'row',
+    gap: SIZES.md,
+  },
+  sheetOption: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  sheetOptionPreview: {
+    width: '100%',
+    height: 70,
+    borderRadius: SIZES.radiusSm,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  previewDefault: {
+    backgroundColor: '#2D3B52',
+  },
+  previewSatellite: {
+    backgroundColor: '#3A4A2E',
+  },
+  sheetOptionPreviewActive: {
+    borderColor: COLORS.primary,
+  },
+  sheetOptionLabel: {
+    color: COLORS.textDim,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sheetOptionLabelActive: {
+    color: COLORS.primary,
+  },
 });

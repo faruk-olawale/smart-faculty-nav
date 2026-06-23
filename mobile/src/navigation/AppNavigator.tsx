@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View } from 'react-native';
+import { Map, Search, QrCode, Bot } from 'lucide-react-native';
 import { COLORS } from '../constants/theme';
 import MapScreen from '../screens/MapScreen';
 import BuildingScreen from '../screens/BuildingScreen';
@@ -10,33 +11,23 @@ import SearchScreen from '../screens/SearchScreen';
 import NavigationScreen from '../screens/NavigationScreen';
 import ARScreen from '../screens/ARScreen';
 import QRScreen from '../screens/QRScreen';
-
-function AssistantScreen() {
-  return (
-    <View style={{
-      flex: 1, backgroundColor: COLORS.background,
-      alignItems: 'center', justifyContent: 'center',
-    }}>
-      <Text style={{ fontSize: 32, marginBottom: 12 }}>🤖</Text>
-      <Text style={{ color: COLORS.text, fontSize: 16, fontWeight: '700' }}>
-        AI Assistant
-      </Text>
-      <Text style={{ color: COLORS.textDim, fontSize: 13, marginTop: 6 }}>
-        Coming in Stage 10
-      </Text>
-    </View>
-  );
-}
+import AssistantScreen from '../screens/AssistantScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-function TabIcon({ emoji, label, focused }: {
-  emoji: string; label: string; focused: boolean;
+function TabIcon({ Icon, label, focused }: {
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  label: string;
+  focused: boolean;
 }) {
   return (
-    <View style={{ alignItems: 'center', paddingTop: 6, gap: 2 }}>
-      <Text style={{ fontSize: focused ? 21 : 19 }}>{emoji}</Text>
+    <View style={{ alignItems: 'center', paddingTop: 6, gap: 4 }}>
+      <Icon
+        size={focused ? 23 : 21}
+        color={focused ? COLORS.primary : COLORS.textDim}
+        strokeWidth={focused ? 2.4 : 2}
+      />
       <Text style={{
         fontSize: 9,
         color: focused ? COLORS.primary : COLORS.textDim,
@@ -68,7 +59,7 @@ function Tabs() {
         component={MapScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🗺️" label="Map" focused={focused} />
+            <TabIcon Icon={Map} label="Map" focused={focused} />
           ),
         }}
       />
@@ -77,7 +68,7 @@ function Tabs() {
         component={SearchScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🔍" label="Search" focused={focused} />
+            <TabIcon Icon={Search} label="Search" focused={focused} />
           ),
         }}
       />
@@ -86,7 +77,7 @@ function Tabs() {
         component={QRScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📱" label="QR" focused={focused} />
+            <TabIcon Icon={QrCode} label="QR" focused={focused} />
           ),
         }}
       />
@@ -95,7 +86,7 @@ function Tabs() {
         component={AssistantScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🤖" label="Assistant" focused={focused} />
+            <TabIcon Icon={Bot} label="Assistant" focused={focused} />
           ),
         }}
       />

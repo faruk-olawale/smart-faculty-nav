@@ -67,3 +67,14 @@ export const qrApi = {
   generate: (qrLocationId: string) =>
     client.get<never, Res<{ qrDataUrl: string; qrLocation: any }>>(`/qr/${qrLocationId}/generate`),
 };
+
+export const assistantVoiceApi = {
+  queryVoice: (
+    audioBase64: string,
+    mimeType: string,
+    context?: { userLat?: number; userLng?: number }
+  ) =>
+    client.post<never, Res<AIResponse & { transcript?: string }>>('/assistant/voice', {
+      audioBase64, mimeType, context,
+    }),
+};
