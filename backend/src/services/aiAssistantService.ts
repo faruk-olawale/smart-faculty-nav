@@ -271,9 +271,18 @@ export async function processVoiceQuery(
     };
   } catch (err) {
     console.error('Gemini voice assistant error:', err);
+  } catch (err: any) {
+    console.error("Gemini voice error STATUS:", err?.status);
+    console.error("Gemini voice error MESSAGE:", err?.message);
+    const isQuota = err?.status === 429;
+    const isAudio = err?.message?.includes("audio") || err?.message?.includes("mime");
     return {
-      reply: 'Something went wrong understanding that. Please try again.',
-      suggestions: ['Where is the NLP Lab?', 'List all locations'],
+      reply: isQuota
+        ? "The AI is rate limited. Please wait a moment and try again."
+        : isAudio
+        ? "Could not process the audio. Please speak again."
+        : "Something went wrong understanding that. Please try again.",
+      suggestions: ["Where is the NLP Lab?", "List all locations"],
     };
   }
 }
